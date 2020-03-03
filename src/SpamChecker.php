@@ -9,23 +9,23 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class SpamChecker
 {
-    private $client;
-    private $endpoint;
+    private HttpClientInterface $client;
+    private string $endpoint;
 
     /**
      * SpamChecker constructor.
-     * @param $client
-     * @param $endpoint
+     * @param HttpClientInterface $client
+     * @param string $akismetKey
      */
-    public function __construct(HttpClientInterface $client, string $akismeKey)
+    public function __construct(HttpClientInterface $client, string $akismetKey)
     {
         $this->client = $client;
-        $this->endpoint = sprintf('https://%s.rest.akisme.com/1.1/comment-check', $akismeKey);
+        $this->endpoint = sprintf('https://%s.rest.akisme.com/1.1/comment-check', $akismetKey);
     }
 
     public function getSpamScore(Comment $comment, array $context): int
     {
-        $response = $this->client->request('POST' . $this->endpoint, (string)[
+        $response = $this->client->request('POST', $this->endpoint, [
             'body' => array_merge($context, [
                 'blog' => 'https://guestbook.example.com',
                 'comment_type' => 'comment',
@@ -37,7 +37,7 @@ class SpamChecker
             ]),
         ]);
         $headers = $response->getHeaders();
-        if ('discard' === $headers['x-akismet-pro-tip'][0] ?? '') {
+        if ('discard' === ($headers['x-akismet-pro-tip'][0] ?? '')) {
             return 2;
         }
         $content = $response->getContent();
