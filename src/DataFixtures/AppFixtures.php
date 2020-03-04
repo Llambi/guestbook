@@ -11,15 +11,15 @@ use Symfony\Component\Security\Core\Encoder\EncoderFactoryInterface;
 
 class AppFixtures extends Fixture
 {
-    private $encodeFactory;
+    private $encoderFactory;
 
     /**
      * AppFixtures constructor.
      * @param $encodeFactory
      */
-    public function __construct(EncoderFactoryInterface $encodeFactory)
+    public function __construct(EncoderFactoryInterface $encoderFactory)
     {
-        $this->encodeFactory = $encodeFactory;
+        $this->encoderFactory = $encoderFactory;
     }
 
 
@@ -29,6 +29,7 @@ class AppFixtures extends Fixture
         $amsterdam
             ->setCity('Amsterdam')
             ->setYear('2019')
+            ->setSlug('amsterdam-2019')
             ->setIsInternational(true);
         $manager->persist($amsterdam);
 
@@ -36,6 +37,7 @@ class AppFixtures extends Fixture
         $paris
             ->setCity('Paris')
             ->setYear('2020')
+            ->setSlug('paris-2020')
             ->setIsInternational(false);
         $manager->persist($paris);
 
