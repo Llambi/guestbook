@@ -14,6 +14,8 @@ use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Notifier\Notification\Notification;
+use Symfony\Component\Notifier\NotifierInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Twig\Environment;
 
@@ -62,7 +64,7 @@ class ConferenceController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $comment->setConference($conference);
             if ($photo = $form['photoFilename']->getData()) {
-                $filename = bin2hex(random_bytes(6) . '_' . $photo->guessExtension());
+                $filename = bin2hex(random_bytes(6)) . '.' . $photo->guessExtension();
                 try {
                     $photo->move($photoDir, $filename);
                 } catch (FileException $e) {

@@ -3,6 +3,7 @@
 
 namespace App\MessageHandler;
 
+use App\ImageOptimizer;
 use App\Messages\CommentMessage;
 use App\Repository\CommentRepository;
 use App\SpamChecker;
@@ -22,7 +23,9 @@ class CommentMessageHandler implements MessageHandlerInterface
     private $bus;
     private $workflow;
     private $mailer;
+    private $imageOptimizer;
     private $adminEmail;
+    private $photoDir;
     private $logger;
 
     /**
@@ -35,8 +38,10 @@ class CommentMessageHandler implements MessageHandlerInterface
      * @param LoggerInterface $logger
      * @param MailerInterface $mailer
      * @param string $adminEmail
+     * @param ImageOptimizer $imageOptimizer
+     * @param string $photoDir
      */
-    public function __construct(SpamChecker $spamChecker, EntityManagerInterface $entityManager, CommentRepository $commentRepository, MessageBusInterface $bus, WorkflowInterface $commentStateMachine, LoggerInterface $logger, MailerInterface $mailer, string $adminEmail)
+    public function __construct(SpamChecker $spamChecker, EntityManagerInterface $entityManager, CommentRepository $commentRepository, MessageBusInterface $bus, WorkflowInterface $commentStateMachine, LoggerInterface $logger, MailerInterface $mailer, string $adminEmail, ImageOptimizer $imageOptimizer, string $photoDir)
     {
         $this->spamChecker = $spamChecker;
         $this->entityManager = $entityManager;
@@ -46,6 +51,8 @@ class CommentMessageHandler implements MessageHandlerInterface
         $this->logger = $logger;
         $this->mailer = $mailer;
         $this->adminEmail = $adminEmail;
+        $this->imageOptimizer = $imageOptimizer;
+        $this->photoDir = $photoDir;
     }
 
     public function __invoke(CommentMessage $message)
@@ -73,11 +80,18 @@ class CommentMessageHandler implements MessageHandlerInterface
             $this->bus->dispatch($message);
         } elseif ($this->workflow->can($comment, 'publish') || $this->workflow->can($comment, 'publish_ham')) {
             $this->mailer->send((new NotificationEmail())
-                    ->subject('New comment posted')
-                    ->htmlTemplate('emails/comment_notification.html.twig')
-                    ->from($this->adminEmail)
-                    ->to($this->adminEmail)
-                    ->context(['comment' => $comment]));
+                ->subject('New comment posted')
+                ->htmlTemplate('emails/comment_notification.html.twig')
+                ->from($this->adminEmail)
+                ->to($this->adminEmail)
+                ->context(['comment' => $comment])
+            );
+        } elseif ($this->workflow->can($comment, 'optimize')) {
+            if ($comment->getPhotoFilename()) {
+                $this->imageOptimizer->resize($this->photoDir . '/' . $comment->getPhotoFilename());
+            }
+            $this->workflow->apply($comment, 'optimize');
+            $this->entityManager->flush();
         } elseif ($this->logger) {
             $this->logger->debug('Dropping comment message',
                 ['comment' => $comment->getId(), 'state' => $comment->getState()]);
