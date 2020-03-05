@@ -6,6 +6,7 @@ use App\Entity\Comment;
 use App\Entity\Conference;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Common\Persistence\ManagerRegistry;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 
 /**
@@ -17,24 +18,34 @@ use Doctrine\ORM\Tools\Pagination\Paginator;
 class CommentRepository extends ServiceEntityRepository
 {
     public const PAGINATOR_PER_PAGE = 2;
+    private const DAYS_BEFORE_REJECTED_REMOVAL = 7;
 
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Comment::class);
     }
 
-    public function getCommentPaginator(Conference $conference, int $offSet): Paginator
+    public function deleteOldRejected(): int
     {
-        $query = $this->createQueryBuilder('c')
-            ->andWhere('c.conference = :conference')
-            ->andWhere('c.state = :state')
-            ->setParameter('conference', $conference)
-            ->setParameter('state', 'published')
-            ->orderBy('c.createdAt', 'DESC')
-            ->setMaxResults(self::PAGINATOR_PER_PAGE)
-            ->setFirstResult($offSet)
-            ->getQuery();
-        return new Paginator($query);
+        return $this->getOldRejectedQueryBuilder()->delete()->getQuery()->execute();
+    }
+
+    private function getOldRejectedQueryBuilder(): QueryBuilder
+    {
+        return $this->createQueryBuilder('c')
+            ->andWhere('c.state = :state_rejected or c.state = :state_spam')
+            ->andWhere('c.createdAt < :date')
+            ->setParameters([
+                'state_rejected' => 'rejected',
+                'state_spam' => 'spam',
+                'date' => new \DateTime(-self::DAYS_BEFORE_REJECTED_REMOVAL.' days'),
+            ])
+            ;
+    }
+
+    public function countOldRejected(): int
+    {
+        return $this->getOldRejectedQueryBuilder()->select('COUNT(c.id)')->getQuery()->getSingleScalarResult();
     }
 
     // /**
@@ -65,4 +76,18 @@ class CommentRepository extends ServiceEntityRepository
         ;
     }
     */
+
+    public function getCommentPaginator(Conference $conference, int $offSet): Paginator
+    {
+        $query = $this->createQueryBuilder('c')
+            ->andWhere('c.conference = :conference')
+            ->andWhere('c.state = :state')
+            ->setParameter('conference', $conference)
+            ->setParameter('state', 'published')
+            ->orderBy('c.createdAt', 'DESC')
+            ->setMaxResults(self::PAGINATOR_PER_PAGE)
+            ->setFirstResult($offSet)
+            ->getQuery();
+        return new Paginator($query);
+    }
 }
